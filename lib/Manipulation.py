@@ -12,6 +12,8 @@ import math
 import sys
 import time
 
+import matplotlib.pyplot as plt
+
 
 class ManipulationManager(avango.script.Script):
 
@@ -507,6 +509,21 @@ class GoGo(ManipulationTechnique):
         self.hand_geometry.Material.value.set_uniform("Color", avango.gua.Vec4(1.0,1.0,1.0,1.0))
         self.pointer_node.Children.value.append(self.hand_geometry)
 
+        _Rr_plot = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+        _Rv_plot = []
+        for _plot_value in _Rr_plot:
+            if _plot_value > self.gogo_threshold:
+            _Rv_plot.append(_plot_value + 0.9 * pow((_plot_value - self.gogo_threshold),2)) 
+        else:
+            _Rv_plot.append(_plot_value)
+
+
+        plt.figure(1)  
+        plt.plot(_Rr_plot, _Rv_plot)
+        plt.ylabel('Virtual distance')
+        plt.xlabel('Pointer Distance')
+        plt.show()
+
  
         ### set initial states ###
         self.enable(False)
@@ -638,10 +655,8 @@ class VirtualHand(ManipulationTechnique):
         # Y value
         if self.speed_y>=self.sc_vel:
             self.k=1
-
         elif self.speed_y>self.min_vel and self.speed_y < self.sc_vel:
             self.k=self.speed_y/self.sc_vel
-
         elif self.speed_y<self.min_vel:
             self.k=0
 
@@ -651,10 +666,8 @@ class VirtualHand(ManipulationTechnique):
         # Z value
         if self.speed_z>=self.sc_vel:
             self.k=1
-        
         elif self.speed_z>self.min_vel and self.speed_z < self.sc_vel:
             self.k = self.speed_z/self.sc_vel
-
         elif self.speed_z < self.min_vel:
             self.k = 0
 
