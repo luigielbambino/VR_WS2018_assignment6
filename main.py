@@ -141,7 +141,7 @@ def start():
 
 
     elif hostname == "boreas": # Samsung 3D-TV workstation
-        _tracking_transmitter_offset = avango.gua.make_trans_mat(0.0, -1.515, 1.00) # transformation into tracking coordinate system 
+        _tracking_transmitter_offset = avango.gua.make_trans_mat(0.0, -1.3, 1.45) # transformation into tracking coordinate system 
 
         viewingSetup = StereoViewingSetup(
             SCENEGRAPH = scenegraph,
@@ -158,8 +158,8 @@ def start():
 
         pointerInput = PointerInput()
         pointerInput.init_art_pointer(
-            POINTER_DEVICE_STATION = "device-pointer-4", # 2.4G Mouse
-            POINTER_TRACKING_STATION = "tracking-pointer-4", # 2.4G Mouse
+            POINTER_DEVICE_STATION = "device-pointer-3", # 2.4G Mouse
+            POINTER_TRACKING_STATION = "tracking-pointer-3", # 2.4G Mouse
             TRACKING_TRANSMITTER_OFFSET = _tracking_transmitter_offset,
             KEYBOARD_STATION = "gua-device-keyboard",
         )

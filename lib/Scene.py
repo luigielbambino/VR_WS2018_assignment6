@@ -62,7 +62,7 @@ class Scene:
 
         ## init group node fo whole scene
         self.scene_group = avango.gua.nodes.TransformNode(Name = "scene_group")
-        self.scene_group.Transform.value = avango.gua.make_scale_mat(2.0) # scale to 150%
+        self.scene_group.Transform.value = avango.gua.make_scale_mat(4.0) # scale to 150%
         PARENT_NODE.Children.value.append(self.scene_group)
 
         ## init scene light

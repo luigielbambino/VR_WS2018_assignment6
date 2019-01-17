@@ -10,6 +10,7 @@ import avango.daemon
 ### import python libraries ###
 import math
 import sys
+import time
 
 
 class ManipulationManager(avango.script.Script):
@@ -118,13 +119,14 @@ class ManipulationTechnique(avango.script.Script):
             
         ### variables ###
         self.enable_flag = False
-        
+        self.intersected_nodes = []
         self.selected_node = None
         self.dragged_node = None
         self.dragging_offset_mat = avango.gua.make_identity_mat()
                 
         self.mf_pick_result = []
         self.pick_result = None # chosen pick result
+        self.pick_results = []
         self.white_list = []   
         self.black_list = ["invisible"]
 
@@ -261,7 +263,15 @@ class ManipulationTechnique(avango.script.Script):
                 if _child_node.get_type() == 'av::gua::TriMeshNode':
                     _child_node.Material.value.set_uniform("enable_color_override", True)
                     _child_node.Material.value.set_uniform("override_color", avango.gua.Vec4(1.0,0.0,0.0,0.3)) # 30% color override
-                
+    
+
+    def intersection(self):
+        #self.pick_results = self.mf_pick_result
+
+        if len(self.mf_pick_result.value) > 0:
+            print(str(self.mf_pick_result.value[0]) + ": intersected array value")
+            for _intersected_node in self.mf_pick_result.value:
+                print(str(_intersected_node) + ": intersected node")
 
 
     ### callback functions ###
@@ -410,6 +420,22 @@ class DepthRay(ManipulationTechnique):
         ### resources ###
 
         ## To-Do: init (geometry) nodes here
+        _loader = avango.gua.nodes.TriMeshLoader()
+
+        self.ray_geometry = _loader.create_geometry_from_file("ray_geometry", "data/objects/cylinder.obj", avango.gua.LoaderFlags.DEFAULTS)
+        self.ray_geometry.Transform.value = \
+            avango.gua.make_trans_mat(0.0,0.0,self.ray_length * -0.5) * \
+            avango.gua.make_scale_mat(self.ray_thickness, self.ray_thickness, self.ray_length)
+        self.ray_geometry.Material.value.set_uniform("Color", avango.gua.Vec4(1.0,0.0,0.0,1.0))
+        self.pointer_node.Children.value.append(self.ray_geometry)
+
+
+        self.intersection_geometry = _loader.create_geometry_from_file("intersection_geometry", "data/objects/sphere.obj", avango.gua.LoaderFlags.DEFAULTS)
+        self.intersection_geometry.Material.value.set_uniform("Color", avango.gua.Vec4(1.0,0.0,0.0,1.0))
+        self.intersection_geometry.Transform.value = \
+            avango.gua.make_trans_mat(0.0,0.0,0.0) * \
+            avango.gua.make_scale_mat(self.depth_marker_size, self.depth_marker_size, self.depth_marker_size)
+        self.pointer_node.Children.value.append(self.intersection_geometry)
         
 
         ### set initial states ###
@@ -422,7 +448,27 @@ class DepthRay(ManipulationTechnique):
             return
 
         ## To-Do: implement depth ray technique here
+        self.angle_marker = ManipulationTechnique.get_roll_angle(self, self.pointer_node.WorldTransform.value)
+        self.depth_marker = self.angle_marker*self.ray_length/-180
+        self.intersection_geometry.Transform.value = avango.gua.make_trans_mat(0.0,0.0,self.depth_marker) * avango.gua.make_scale_mat(self.depth_marker_size)
         
+        print(str(self.angle_marker) + " angle_marker")
+        print(str(self.depth_marker) + " depth_marker")
+        print(str(self.intersection_geometry.Transform.value) + " marker MAT4 after translation")
+
+        ## calc ray intersection
+        ManipulationTechnique.update_intersection(self, PICK_MAT = self.intersection_geometry.WorldTransform.value, PICK_LENGTH = self.ray_length) # call base-class function
+
+        # Highlight objects that intersects the ray
+        ManipulationTechnique.intersection(self) 
+
+        ## update object selection
+        ManipulationTechnique.selection(self) # call base-class function
+
+
+        ## possibly perform object dragging
+        ManipulationTechnique.dragging(self) # call base-class function
+
 
 
 class GoGo(ManipulationTechnique):
@@ -454,6 +500,13 @@ class GoGo(ManipulationTechnique):
         ### resources ###
  
         ## To-Do: init (geometry) nodes here
+        _loader = avango.gua.nodes.TriMeshLoader()
+
+        self.hand_geometry = _loader.create_geometry_from_file("hand_geometry", "data/objects/hand.obj", avango.gua.LoaderFlags.DEFAULTS)
+        self.hand_geometry.Transform.value = avango.gua.make_scale_mat(3)
+        self.hand_geometry.Material.value.set_uniform("Color", avango.gua.Vec4(1.0,1.0,1.0,1.0))
+        self.pointer_node.Children.value.append(self.hand_geometry)
+
  
         ### set initial states ###
         self.enable(False)
@@ -466,6 +519,35 @@ class GoGo(ManipulationTechnique):
             return
 
         ## To-Do: implement Go-Go technique here
+        self.hand_position = self.pointer_node.WorldTransform.value.get_translate()
+        self.head_position = self.HEAD_NODE.WorldTransform.value.get_translate()
+        print(str(self.hand_position) + " hand position")
+        print(str(self.head_position) + " head position")
+
+        self.distance = (self.head_position - self.hand_position).length()
+        #self.distance = pow((self.hand_position.x - self.head_position.x) * 2) + ((self.hand_position.y - self.head_position.y) * 2) + ((self.hand_position.z - self.head_position.z) * 2)),0.5)
+        print(str(self.hand_position.x) + " hand position in x")
+        print(str(self.distance) + " distance between head and hand")
+
+        if self.distance > self.gogo_threshold:
+            self.virtual_distance = (self.distance + 0.9 * pow((self.distance - self.gogo_threshold),2)) - self.gogo_threshold
+            print(str(-self.virtual_distance) + " VD over threshold")
+            self.hand_geometry.Transform.value = avango.gua.make_trans_mat(0.0,0.0,-self.virtual_distance) * avango.gua.make_scale_mat(3)
+        else:
+            self.virtual_distance = self.distance - self.gogo_threshold
+            print(str(self.virtual_distance) + " VD under threshold")
+            self.hand_geometry.Transform.value = avango.gua.make_trans_mat(0.0,0.0,self.virtual_distance) * avango.gua.make_scale_mat(3)
+
+
+        ## calc ray intersection
+        ManipulationTechnique.update_intersection(self, PICK_MAT = self.hand_geometry.WorldTransform.value, PICK_LENGTH = 0.4) # call base-class function
+
+        ## update object selection
+        ManipulationTechnique.selection(self) # call base-class function
+
+
+        ## possibly perform object dragging
+        ManipulationTechnique.dragging(self) # call base-class function
 
             
 
@@ -492,10 +574,23 @@ class VirtualHand(ManipulationTechnique):
         self.sc_vel = 0.15 / 60.0 # in meter/sec
         self.max_vel = 0.25 / 60.0 # in meter/sec
 
+        #get initial values to calculate speed
+        self.previous_frame = time.time()
+        self.previous_position = self.pointer_node.WorldTransform.value.get_translate()
+
+        # New matrices for tranlsation
+        self.matrix_trans = avango.gua.make_identity_mat()
+
 
         ### resources ###
 
-        ## To-Do: init (geometry) nodes here        
+        ## To-Do: init (geometry) nodes here     
+        _loader = avango.gua.nodes.TriMeshLoader()
+
+        self.hand_geometry = _loader.create_geometry_from_file("hand_geometry", "data/objects/hand.obj", avango.gua.LoaderFlags.DEFAULTS)
+        self.hand_geometry.Transform.value = avango.gua.make_scale_mat(3)
+        self.hand_geometry.Material.value.set_uniform("Color", avango.gua.Vec4(1.0,1.0,1.0,1.0))
+        self.pointer_node.Children.value.append(self.hand_geometry)   
 
         ### set initial states ###
         self.enable(False)
@@ -508,3 +603,76 @@ class VirtualHand(ManipulationTechnique):
 
         ## To-Do: implement Virtual Hand (with PRISM filter) technique here
         
+        #Get current position
+        self.current_position = self.pointer_node.WorldTransform.value.get_translate()
+
+        #Calculate the distance travel in the last frame
+        self.frame_distance = self.current_position-self.previous_position
+        self.frame_x = self.frame_distance.x
+        self.frame_y = self.frame_distance.y
+        self.frame_z = self.frame_distance.z
+
+        #Get the time of the frame
+        self.frame_time = time.time() - self.previous_frame 
+
+        #Get speed of each axis during last frame
+        self.speed_x=abs(self.frame_x/self.frame_time)
+        self.speed_y=abs(self.frame_y/self.frame_time)
+        self.speed_z=abs(self.frame_z/self.frame_time)
+
+        self.previous_position = self.pointer_node.WorldTransform.value.get_translate()
+        self.previous_frame = time.time()
+
+
+        # X value
+        if self.speed_x >= self.sc_vel:
+            self.k = 1
+        elif self.speed_x > self.min_vel and self.speed_x < self.sc_vel:
+            self.k = self.speed_x/self.sc_vel
+        elif self.speed_x < self.min_vel:
+            self.k = 0
+
+        self.dObject_x = round((self.frame_x * self.k), 4)
+
+
+        # Y value
+        if self.speed_y>=self.sc_vel:
+            self.k=1
+
+        elif self.speed_y>self.min_vel and self.speed_y < self.sc_vel:
+            self.k=self.speed_y/self.sc_vel
+
+        elif self.speed_y<self.min_vel:
+            self.k=0
+
+        self.dObject_y = round((self.frame_y * self.k), 4)
+
+
+        # Z value
+        if self.speed_z>=self.sc_vel:
+            self.k=1
+        
+        elif self.speed_z>self.min_vel and self.speed_z < self.sc_vel:
+            self.k = self.speed_z/self.sc_vel
+
+        elif self.speed_z < self.min_vel:
+            self.k = 0
+
+        self.dObject_z = round((self.frame_z * self.k), 4)
+
+        print(str(self.dObject_x) + " new x value")
+        print(str(self.dObject_y) + " new y value")
+        print(str(self.dObject_z) + " new z value")
+        #self.matrix_new_position = avango.gua.make_trans_mat(self.dObject_x, self.dObject_y, self.dObject_z) * self.matrix_trans.value
+        self.hand_geometry.Transform.value = avango.gua.make_trans_mat(self.dObject_x, self.dObject_y, self.dObject_z) * avango.gua.make_scale_mat(3)
+        #self.matrix_trans.value = self.matrix_new_position.value
+
+        ## calc ray intersection
+        ManipulationTechnique.update_intersection(self, PICK_MAT = self.hand_geometry.WorldTransform.value, PICK_LENGTH = 0.4) # call base-class function
+
+        ## update object selection
+        ManipulationTechnique.selection(self) # call base-class function
+
+
+        ## possibly perform object dragging
+        ManipulationTechnique.dragging(self) # call base-class function

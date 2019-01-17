@@ -35,7 +35,7 @@ def init_art_tracking_3DTV():
     _dtrack.port = "5010" # ART port
 
     _dtrack.stations[1] = avango.daemon.Station('tracking-glasses-3') # Samsung 3D-TV wired shutter glasses
-    _dtrack.stations[2] = avango.daemon.Station('tracking-pointer-4') # 2.4F Mouse Pointer
+    _dtrack.stations[2] = avango.daemon.Station('tracking-pointer-3') # 2.4F Mouse Pointer
 
     device_list.append(_dtrack)
     print("ART Tracking @3DTV started")
@@ -138,7 +138,6 @@ def init_pointer1(): # HAS pointer
 
     if _string is not None:
         _pointer = avango.daemon.HIDInput()
-
         _pointer.station = avango.daemon.Station("device-pointer-1") # create a station to propagate the input events
         _pointer.device = _string
 
@@ -193,23 +192,23 @@ def init_pointer3(): # 2.4G Mouse
     print("2.4G Pointer NOT found!")
 
 
-def init_pointer4(): # 2.4G Mouse
-    _string = get_event_string(2, "2.4G KB 2.4G Mouse")
+def init_pointer4(): # MOSART pointer red
+    _string = get_event_string(1, "MOSART Semi. Input Device")
 
     if _string is not None:           
         _pointer = avango.daemon.HIDInput()
         _pointer.station = avango.daemon.Station("device-pointer-4") # create a station to propagate the input events
         _pointer.device = _string
 
-        _pointer.buttons[0] = "EV_KEY::BTN_LEFT"
+        _pointer.buttons[0] = "EV_KEY::KEY_PAGEUP"
 
         device_list.append(_pointer)
 
-        print("2.4G Pointer started at:", _string)
+        print("MOSART Pointer started at:", _string)
 
         return
 
-    print("2.4G Pointer NOT found!")
+    print("MOSART Pointer NOT found!")
 
 
 
@@ -252,18 +251,10 @@ init_art_tracking_wall()
 init_art_tracking_3DTV()
 init_keyboard()
 init_spacemouse()
-
-hostname = open('/etc/hostname', 'r').readline()
-hostname = hostname.strip(" \n")
-
-if hostname == "andromeda":
-    init_pointer1()
-elif hostname == "perseus":
-    init_pointer2()
-elif hostname == "athena":
-    init_pointer3()
-elif hostname == "boreas":
-    init_pointer4()
+init_pointer1()
+init_pointer2()
+init_pointer3()
+init_pointer4()
 
 
 avango.daemon.run(device_list)
